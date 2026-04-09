@@ -2,6 +2,7 @@ package com.rulesengine.routes
 
 import com.rulesengine.models.*
 import com.rulesengine.plugins.NotFoundException
+import com.rulesengine.services.EnvelopeResolver
 import com.rulesengine.tables.AgentsTable
 import com.rulesengine.tables.DomainEnum
 import io.ktor.http.*
@@ -43,7 +44,7 @@ fun Route.agentRoutes() {
 
         // GET /agents/{id}
         get("{id}") {
-            val id = UUID.fromString(call.parameters["id"] ?: throw IllegalArgumentException("Missing id"))
+            val id = call.uuidParam("id")
             val agent = newSuspendedTransaction(Dispatchers.IO) {
                 AgentsTable.selectAll().where { AgentsTable.id eq id }.singleOrNull()?.toAgentResponse()
             } ?: throw NotFoundException("Agent not found")
@@ -52,7 +53,7 @@ fun Route.agentRoutes() {
 
         // PUT /agents/{id}
         put("{id}") {
-            val id = UUID.fromString(call.parameters["id"] ?: throw IllegalArgumentException("Missing id"))
+            val id = call.uuidParam("id")
             val req = call.receive<AgentRequest>()
             val agent = newSuspendedTransaction(Dispatchers.IO) {
                 val updated = AgentsTable.update({ AgentsTable.id eq id }) {
@@ -68,12 +69,26 @@ fun Route.agentRoutes() {
 
         // DELETE /agents/{id}
         delete("{id}") {
-            val id = UUID.fromString(call.parameters["id"] ?: throw IllegalArgumentException("Missing id"))
+            val id = call.uuidParam("id")
             newSuspendedTransaction(Dispatchers.IO) {
                 val deleted = AgentsTable.deleteWhere { AgentsTable.id eq id }
                 if (deleted == 0) throw NotFoundException("Agent not found")
             }
             call.respond(HttpStatusCode.NoContent)
+        }
+
+        // GET /agents/{id}/effective-envelope
+        get("{id}/effective-envelope") {
+            val id = call.uuidParam("id")
+            val envelope = EnvelopeResolver.resolve(id)
+            call.respond(envelope)
+        }
+
+        // GET /agents/{id}/effective-policies
+        get("{id}/effective-policies") {
+            val id = call.uuidParam("id")
+            val policies = EnvelopeResolver.effectivePolicies(id)
+            call.respond(policies)
         }
     }
 }

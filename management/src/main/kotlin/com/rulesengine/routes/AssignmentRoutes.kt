@@ -44,7 +44,7 @@ fun Route.assignmentRoutes() {
 
         // DELETE /assignments/{id}
         delete("{id}") {
-            val id = UUID.fromString(call.parameters["id"] ?: throw IllegalArgumentException("Missing id"))
+            val id = call.uuidParam("id")
             newSuspendedTransaction(Dispatchers.IO) {
                 val deleted = PolicyAssignmentsTable.deleteWhere { PolicyAssignmentsTable.id eq id }
                 if (deleted == 0) throw NotFoundException("Assignment not found")
@@ -56,9 +56,7 @@ fun Route.assignmentRoutes() {
     // GET /agents/{agentId}/assignments — list assignments for an agent (direct only for Phase 1)
     route("/agents/{agentId}/assignments") {
         get {
-            val agentId = UUID.fromString(
-                call.parameters["agentId"] ?: throw IllegalArgumentException("Missing agentId")
-            )
+            val agentId = call.uuidParam("agentId")
             val assignments = newSuspendedTransaction(Dispatchers.IO) {
                 PolicyAssignmentsTable.selectAll()
                     .where { PolicyAssignmentsTable.agentId eq agentId }

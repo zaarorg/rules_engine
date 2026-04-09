@@ -11,10 +11,9 @@ use tracing_subscriber::EnvFilter;
 mod db;
 mod routes;
 
-#[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
-    pub policies: Arc<RwLock<PolicySet>>,
+    pub policies: RwLock<PolicySet>,
 }
 
 #[tokio::main]
@@ -32,10 +31,7 @@ async fn main() {
 
     // Retry policy loading — Flyway migrations run from the management service,
     // so tables may not exist yet when the engine starts.
-    let mut policy_set: PolicySet = "".parse().unwrap_or_else(|_| {
-        // Empty string may not parse; this is a fallback
-        panic!("Failed to create empty PolicySet")
-    });
+    let mut policy_set = PolicySet::new();
     for attempt in 1..=30 {
         match db::load_policy_sources(&pool).await {
             Ok(sources) => {
@@ -64,7 +60,7 @@ async fn main() {
 
     let state = Arc::new(AppState {
         pool,
-        policies: Arc::new(RwLock::new(policy_set)),
+        policies: RwLock::new(policy_set),
     });
 
     let app = Router::new()

@@ -1,6 +1,8 @@
 package com.rulesengine.tables
 
 import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.sql.javatime.date
+import org.jetbrains.exposed.sql.javatime.time
 import org.jetbrains.exposed.sql.javatime.timestampWithTimeZone
 
 object OrganizationsTable : Table("organizations") {
@@ -59,11 +61,12 @@ object DimensionDefinitionsTable : Table("dimension_definitions") {
     val kind = pgEnum("kind", "dimension_kind", DimensionKind::fromDb, DimensionKind::dbValue)
     val numericMax = decimal("numeric_max", 19, 4).nullable()
     val rateWindow = text("rate_window").nullable()
-    val setMembers = text("set_members").nullable() // TEXT[] — read as string for now
+    // PostgreSQL TEXT[] — Exposed lacks native array column support; stored/read as string representation
+    val setMembers = text("set_members").nullable()
     val boolDefault = bool("bool_default").nullable()
-    val temporalStart = text("temporal_start").nullable() // TIME type — read as string
-    val temporalEnd = text("temporal_end").nullable()
-    val temporalExpiry = text("temporal_expiry").nullable() // DATE type — read as string
+    val temporalStart = time("temporal_start").nullable()
+    val temporalEnd = time("temporal_end").nullable()
+    val temporalExpiry = date("temporal_expiry").nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

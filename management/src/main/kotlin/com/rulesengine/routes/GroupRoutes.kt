@@ -43,7 +43,7 @@ fun Route.groupRoutes() {
 
         // GET /groups/{id}
         get("{id}") {
-            val id = UUID.fromString(call.parameters["id"] ?: throw IllegalArgumentException("Missing id"))
+            val id = call.uuidParam("id")
             val group = newSuspendedTransaction(Dispatchers.IO) {
                 GroupsTable.selectAll().where { GroupsTable.id eq id }.singleOrNull()?.toGroupResponse()
             } ?: throw NotFoundException("Group not found")
@@ -52,7 +52,7 @@ fun Route.groupRoutes() {
 
         // DELETE /groups/{id}
         delete("{id}") {
-            val id = UUID.fromString(call.parameters["id"] ?: throw IllegalArgumentException("Missing id"))
+            val id = call.uuidParam("id")
             newSuspendedTransaction(Dispatchers.IO) {
                 val deleted = GroupsTable.deleteWhere { GroupsTable.id eq id }
                 if (deleted == 0) throw NotFoundException("Group not found")

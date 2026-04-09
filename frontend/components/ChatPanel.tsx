@@ -37,14 +37,15 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Describe a policy..."
+            placeholder="AI assistant coming in Phase 2"
+            disabled
             style={{
               flex: 1, background: 'none', border: 'none',
               fontSize: 13, color: 'var(--text-primary)',
               outline: 'none', fontFamily: 'var(--font-sans)',
             }}
           />
-          <button style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer' }}>
+          <button disabled style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'not-allowed', opacity: 0.5 }}>
             <Send />
           </button>
         </div>

@@ -41,7 +41,7 @@ fun Route.decisionLogRoutes() {
 
         // GET /decisions/{id}
         get("{id}") {
-            val id = UUID.fromString(call.parameters["id"] ?: throw IllegalArgumentException("Missing id"))
+            val id = call.uuidParam("id")
             val decision = newSuspendedTransaction(Dispatchers.IO) {
                 DecisionLogTable.selectAll()
                     .where { DecisionLogTable.id eq id }

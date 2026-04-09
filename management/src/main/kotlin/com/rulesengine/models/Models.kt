@@ -14,6 +14,8 @@ data class PolicyResponse(
     val effect: String,
     val orgId: String,
     val activeVersionId: String? = null,
+    // Serialized via OffsetDateTime.toString() which produces ISO 8601 (e.g. 2024-01-15T10:30:00+00:00).
+    // May omit trailing second/sub-second zeros. Add a custom serializer if clients need strict RFC 3339.
     val createdAt: String
 )
 
@@ -99,6 +101,119 @@ data class DecisionLogResponse(
     val outcome: String,
     val reason: String? = null,
     val matchedVersionId: String? = null
+)
+
+// Action Types
+@Serializable
+data class ActionTypeResponse(
+    val id: String,
+    val domain: String,
+    val name: String,
+    val description: String? = null
+)
+
+@Serializable
+data class DimensionDefResponse(
+    val id: String,
+    val dimensionName: String,
+    val kind: String,
+    val numericMax: Double? = null,
+    val rateWindow: String? = null,
+    val setMembers: List<String>? = null,
+    val boolDefault: Boolean? = null,
+    val temporalStart: String? = null,
+    val temporalEnd: String? = null,
+    val temporalExpiry: String? = null
+)
+
+@Serializable
+data class ActionTypeWithDimensionsResponse(
+    val id: String,
+    val domain: String,
+    val name: String,
+    val description: String? = null,
+    val dimensions: List<DimensionDefResponse>
+)
+
+// Memberships
+@Serializable
+data class GroupMemberResponse(
+    val agentId: String,
+    val agentName: String,
+    val email: String? = null,
+    val domain: String,
+    val isActive: Boolean
+)
+
+@Serializable
+data class MembershipRequest(
+    val agentId: String
+)
+
+// Effective Policies (RSoP)
+@Serializable
+data class EffectivePolicyResponse(
+    val policyId: String,
+    val policyName: String,
+    val effect: String,
+    val domain: String,
+    val groupPath: String? = null,
+    val groupName: String? = null,
+    val versionNumber: Int,
+    val constraints: String
+)
+
+// Effective Envelope
+@Serializable
+data class DimensionSource(
+    val level: String,
+    val groupName: String?,
+    val value: String
+)
+
+@Serializable
+data class ResolvedDimension(
+    val dimensionName: String,
+    val kind: String,
+    val effectiveMax: Double? = null,
+    val effectiveMembers: List<String>? = null,
+    val effectiveValue: Boolean? = null,
+    val effectiveStart: String? = null,
+    val effectiveEnd: String? = null,
+    val effectiveExpiry: String? = null,
+    val effectiveRate: Int? = null,
+    val effectiveWindow: String? = null,
+    val sources: List<DimensionSource> = emptyList()
+)
+
+@Serializable
+data class ResolvedAction(
+    val actionType: String,
+    val actionName: String,
+    val dimensions: Map<String, ResolvedDimension>,
+    val hasDenyOverride: Boolean = false,
+    val denySource: String? = null
+)
+
+@Serializable
+data class EffectiveEnvelopeResponse(
+    val agentId: String,
+    val agentName: String,
+    val actions: List<ResolvedAction>
+)
+
+// Cedar Generation
+@Serializable
+data class CedarGenerateRequest(
+    val constraints: String,
+    val principal: String? = null,
+    val principalType: String = "group",
+    val actionType: String? = null
+)
+
+@Serializable
+data class CedarGenerateResponse(
+    val cedarSource: String
 )
 
 // Health

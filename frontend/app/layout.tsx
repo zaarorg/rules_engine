@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { Header } from '@/components/layout/Header';
 
 export const metadata: Metadata = {
   title: 'Governance Console — Rules Engine',
-  description: 'Cedar policy management console',
+  description: 'Agent governance and policy management console',
 };
 
 export default function RootLayout({
@@ -13,7 +14,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Header />
+        <main className="app-main">
+          {children}
+        </main>
+      </body>
     </html>
   );
 }

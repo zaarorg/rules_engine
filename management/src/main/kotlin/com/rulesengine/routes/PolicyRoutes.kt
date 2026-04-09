@@ -2,6 +2,7 @@ package com.rulesengine.routes
 
 import com.rulesengine.models.*
 import com.rulesengine.plugins.NotFoundException
+import com.rulesengine.services.CedarGenerator
 import com.rulesengine.services.CedarValidator
 import com.rulesengine.tables.PoliciesTable
 import com.rulesengine.tables.PolicyVersionsTable
@@ -46,7 +47,7 @@ fun Route.policyRoutes() {
 
         // GET /policies/{id}
         get("{id}") {
-            val id = UUID.fromString(call.parameters["id"] ?: throw IllegalArgumentException("Missing id"))
+            val id = call.uuidParam("id")
             val policy = newSuspendedTransaction(Dispatchers.IO) {
                 PoliciesTable.selectAll().where { PoliciesTable.id eq id }.singleOrNull()?.toPolicyResponse()
             } ?: throw NotFoundException("Policy not found")
@@ -55,7 +56,7 @@ fun Route.policyRoutes() {
 
         // PUT /policies/{id}
         put("{id}") {
-            val id = UUID.fromString(call.parameters["id"] ?: throw IllegalArgumentException("Missing id"))
+            val id = call.uuidParam("id")
             val req = call.receive<PolicyRequest>()
             val policy = newSuspendedTransaction(Dispatchers.IO) {
                 val updated = PoliciesTable.update({ PoliciesTable.id eq id }) {
@@ -71,7 +72,7 @@ fun Route.policyRoutes() {
 
         // DELETE /policies/{id}
         delete("{id}") {
-            val id = UUID.fromString(call.parameters["id"] ?: throw IllegalArgumentException("Missing id"))
+            val id = call.uuidParam("id")
             newSuspendedTransaction(Dispatchers.IO) {
                 val deleted = PoliciesTable.deleteWhere { PoliciesTable.id eq id }
                 if (deleted == 0) throw NotFoundException("Policy not found")
@@ -81,7 +82,7 @@ fun Route.policyRoutes() {
 
         // GET /policies/{id}/versions
         get("{id}/versions") {
-            val policyId = UUID.fromString(call.parameters["id"] ?: throw IllegalArgumentException("Missing id"))
+            val policyId = call.uuidParam("id")
             val versions = newSuspendedTransaction(Dispatchers.IO) {
                 PolicyVersionsTable.selectAll()
                     .where { PolicyVersionsTable.policyId eq policyId }
@@ -93,7 +94,7 @@ fun Route.policyRoutes() {
 
         // POST /policies/{id}/versions — create new version
         post("{id}/versions") {
-            val policyId = UUID.fromString(call.parameters["id"] ?: throw IllegalArgumentException("Missing id"))
+            val policyId = call.uuidParam("id")
             val req = call.receive<PolicyVersionRequest>()
 
             // Validate Cedar source
@@ -137,10 +138,70 @@ fun Route.policyRoutes() {
             call.respond(HttpStatusCode.Created, version)
         }
 
+        // POST /policies/{id}/versions/generate — generate Cedar from structured constraints
+        post("{id}/versions/generate") {
+            val policyId = call.uuidParam("id")
+            val req = call.receive<CedarGenerateRequest>()
+
+            val version = newSuspendedTransaction(Dispatchers.IO) {
+                // Verify policy exists and get its effect
+                val policy = PoliciesTable.selectAll()
+                    .where { PoliciesTable.id eq policyId }
+                    .singleOrNull() ?: throw NotFoundException("Policy not found")
+
+                val effect = policy[PoliciesTable.effect].dbValue
+
+                // Generate Cedar source from constraints
+                val cedarSource = CedarGenerator.generate(
+                    constraintsJson = req.constraints,
+                    effect = effect,
+                    principal = req.principal,
+                    principalType = req.principalType,
+                    actionType = req.actionType
+                )
+
+                // Validate the generated Cedar
+                val validation = CedarValidator.validate(cedarSource)
+                if (!validation.valid) {
+                    throw IllegalArgumentException(
+                        "Generated Cedar is invalid: ${validation.errors.joinToString(", ")}"
+                    )
+                }
+
+                // Get next version number
+                val maxVersion = PolicyVersionsTable
+                    .select(PolicyVersionsTable.versionNumber)
+                    .where { PolicyVersionsTable.policyId eq policyId }
+                    .maxByOrNull { it[PolicyVersionsTable.versionNumber] }
+                    ?.get(PolicyVersionsTable.versionNumber) ?: 0
+                val nextVersion = maxVersion + 1
+
+                val versionId = java.util.UUID.randomUUID()
+                PolicyVersionsTable.insert {
+                    it[PolicyVersionsTable.id] = versionId
+                    it[PolicyVersionsTable.policyId] = policyId
+                    it[PolicyVersionsTable.versionNumber] = nextVersion
+                    it[PolicyVersionsTable.constraints] = req.constraints
+                    it[PolicyVersionsTable.cedarSource] = cedarSource
+                }
+
+                // Set as active version
+                PoliciesTable.update({ PoliciesTable.id eq policyId }) {
+                    it[activeVersionId] = versionId
+                }
+
+                PolicyVersionsTable.selectAll()
+                    .where { PolicyVersionsTable.id eq versionId }
+                    .single()
+                    .toVersionResponse()
+            }
+            call.respond(io.ktor.http.HttpStatusCode.Created, version)
+        }
+
         // POST /policies/{id}/versions/{versionId}/activate
         post("{id}/versions/{versionId}/activate") {
-            val policyId = UUID.fromString(call.parameters["id"] ?: throw IllegalArgumentException("Missing id"))
-            val versionId = UUID.fromString(call.parameters["versionId"] ?: throw IllegalArgumentException("Missing versionId"))
+            val policyId = call.uuidParam("id")
+            val versionId = call.uuidParam("versionId")
 
             newSuspendedTransaction(Dispatchers.IO) {
                 // Verify version exists and belongs to this policy

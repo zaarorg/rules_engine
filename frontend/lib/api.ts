@@ -69,6 +69,84 @@ export interface CheckResponse {
   diagnostics: string[];
 }
 
+// Action Types & Dimensions
+export interface DimensionDefResponse {
+  id: string;
+  dimensionName: string;
+  kind: string;
+  numericMax: number | null;
+  rateWindow: string | null;
+  setMembers: string[] | null;
+  boolDefault: boolean | null;
+  temporalStart: string | null;
+  temporalEnd: string | null;
+  temporalExpiry: string | null;
+}
+
+export interface ActionTypeWithDimensionsResponse {
+  id: string;
+  domain: string;
+  name: string;
+  description: string | null;
+  dimensions: DimensionDefResponse[];
+}
+
+// Group Memberships
+export interface GroupMemberResponse {
+  agentId: string;
+  agentName: string;
+  email: string | null;
+  domain: string;
+  isActive: boolean;
+}
+
+// Effective Policies (RSoP)
+export interface EffectivePolicyResponse {
+  policyId: string;
+  policyName: string;
+  effect: string;
+  domain: string;
+  groupPath: string | null;
+  groupName: string | null;
+  versionNumber: number;
+  constraints: string;
+}
+
+// Effective Envelope
+export interface DimensionSource {
+  level: string;
+  groupName: string | null;
+  value: string;
+}
+
+export interface ResolvedDimension {
+  dimensionName: string;
+  kind: string;
+  effectiveMax: number | null;
+  effectiveMembers: string[] | null;
+  effectiveValue: boolean | null;
+  effectiveStart: string | null;
+  effectiveEnd: string | null;
+  effectiveExpiry: string | null;
+  effectiveRate: number | null;
+  effectiveWindow: string | null;
+  sources: DimensionSource[];
+}
+
+export interface ResolvedAction {
+  actionType: string;
+  actionName: string;
+  dimensions: Record<string, ResolvedDimension>;
+  hasDenyOverride: boolean;
+  denySource: string | null;
+}
+
+export interface EffectiveEnvelopeResponse {
+  agentId: string;
+  agentName: string;
+  actions: ResolvedAction[];
+}
+
 // Fetch helpers
 
 async function get<T>(url: string): Promise<T> {
@@ -120,3 +198,37 @@ export const fetchDecisions = (params?: { agentId?: string; limit?: number }) =>
 
 export const checkPolicy = (principal: string, action: string, resource: string, context: Record<string, unknown> = {}) =>
   post<CheckResponse>(`${ENGINE}/check`, { principal, action, resource, context });
+
+// Action Types
+export const fetchActionTypes = () => get<ActionTypeWithDimensionsResponse[]>(`${API}/action-types`);
+export const fetchActionType = (id: string) => get<ActionTypeWithDimensionsResponse>(`${API}/action-types/${id}`);
+
+// Group Memberships
+export const fetchGroupMembers = (groupId: string) => get<GroupMemberResponse[]>(`${API}/groups/${groupId}/members`);
+export const addGroupMember = (groupId: string, agentId: string) =>
+  post<{ status: string }>(`${API}/groups/${groupId}/members`, { agentId });
+export const removeGroupMember = (groupId: string, agentId: string) =>
+  del(`${API}/groups/${groupId}/members/${agentId}`);
+
+// Agent Groups
+export const fetchAgentGroups = (agentId: string) => get<GroupResponse[]>(`${API}/agents/${agentId}/groups`);
+
+// Effective Policies & Envelope
+export const fetchEffectivePolicies = (agentId: string) =>
+  get<EffectivePolicyResponse[]>(`${API}/agents/${agentId}/effective-policies`);
+export const fetchEffectiveEnvelope = (agentId: string) =>
+  get<EffectiveEnvelopeResponse>(`${API}/agents/${agentId}/effective-envelope`);
+
+// Cedar Generation
+export const generateCedarFromConstraints = (policyId: string, constraints: string, principal?: string, principalType?: string) =>
+  post<PolicyVersionResponse>(`${API}/policies/${policyId}/versions/generate`, {
+    constraints, principal, principalType: principalType || 'group',
+  });
+
+// Create entities
+export const createPolicy = (body: { name: string; domain: string; effect: string; orgId: string }) =>
+  post<PolicyResponse>(`${API}/policies`, body);
+export const createGroup = (body: { name: string; nodeType: string; path: string; orgId: string; parentId?: string }) =>
+  post<GroupResponse>(`${API}/groups`, body);
+export const createAgent = (body: { name: string; domain: string; orgId: string; email?: string }) =>
+  post<AgentResponse>(`${API}/agents`, body);

@@ -1,13 +1,20 @@
 package com.rulesengine.services
 
+import com.cedarpolicy.model.policy.PolicySet
+
 object CedarValidator {
     fun validate(cedarSource: String): ValidationResult {
-        // Phase 1: basic validation — check non-empty and basic Cedar syntax markers
         if (cedarSource.isBlank()) return ValidationResult(false, listOf("Cedar source is empty"))
-        // Try to detect basic syntax issues
-        val hasPermitOrForbid = cedarSource.contains("permit") || cedarSource.contains("forbid")
-        if (!hasPermitOrForbid) return ValidationResult(false, listOf("Cedar policy must contain 'permit' or 'forbid'"))
-        return ValidationResult(true, emptyList())
+
+        return try {
+            // Use cedar-java to parse the policy source; throws on invalid syntax
+            PolicySet.parsePolicies(cedarSource)
+            ValidationResult(true, emptyList())
+        } catch (e: Exception) {
+            // Surface the cedar-java parse error to the caller
+            val message = e.message ?: "Cedar parse error"
+            ValidationResult(false, listOf(message))
+        }
     }
 }
 

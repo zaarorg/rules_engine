@@ -22,7 +22,8 @@ inline fun <reified T : Enum<T>> Table.pgEnum(
     return customEnumeration(name, enumTypeName, { fromDb(it as String) }, { toDb(it) })
 }
 
-// Kotlin enum types matching the PostgreSQL enums
+// Kotlin enum types matching the PostgreSQL enums.
+// Each enum uses the same fromDb()/dbValue pattern — intentionally kept explicit per-enum for readability.
 enum class DomainEnum(val dbValue: String) {
     finance("finance"),
     communication("communication"),
