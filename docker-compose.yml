@@ -1,0 +1,106 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rules_engine}
+      POSTGRES_USER: ${POSTGRES_USER:-rules}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rules}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rules} -d ${POSTGRES_DB:-rules_engine}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [app]
+
+  engine:
+    build:
+      context: ./engine
+      dockerfile: Dockerfile.dev
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-rules}:${POSTGRES_PASSWORD:-rules}@postgres:5432/${POSTGRES_DB:-rules_engine}
+      RUST_LOG: debug
+    ports:
+      - "${ENGINE_PORT:-3001}:3001"
+    depends_on:
+      management:
+        condition: service_healthy
+    volumes:
+      - ./engine:/app
+      - cargo_registry:/usr/local/cargo/registry
+      - cargo_git:/usr/local/cargo/git
+      - engine_target:/app/target
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+    networks: [app]
+
+  management:
+    build:
+      context: ./management
+      dockerfile: Dockerfile.dev
+    environment:
+      JDBC_DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rules_engine}
+      DB_USER: ${POSTGRES_USER:-rules}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-rules}
+      ENGINE_URL: http://engine:3001
+    ports:
+      - "${MANAGEMENT_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./management:/app
+      - gradle_cache:/root/.gradle
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+    networks: [app]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    environment:
+      NEXT_PUBLIC_MANAGEMENT_URL: http://localhost:8080
+      MANAGEMENT_INTERNAL_URL: http://management:8080
+      ENGINE_INTERNAL_URL: http://engine:3001
+    ports:
+      - "${FRONTEND_PORT:-3100}:3000"
+    depends_on:
+      management:
+        condition: service_healthy
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [app]
+
+volumes:
+  postgres_data:
+  cargo_registry:
+  cargo_git:
+  engine_target:
+  gradle_cache:
+
+networks:
+  app:
+    driver: bridge

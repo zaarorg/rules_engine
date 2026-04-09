@@ -12,6 +12,23 @@ build/
 .next/
 out/
 
+# Rust
+engine/target/
+**/*.rs.bk
+
+# Kotlin / Gradle
+management/build/
+management/.gradle/
+management/.kotlin/
+.gradle/
+*.class
+*.jar
+!management/gradle/wrapper/gradle-wrapper.jar
+
+# Node (frontend)
+frontend/.next/
+frontend/node_modules/
+
 # Logs
 *.log
 npm-debug.log*
