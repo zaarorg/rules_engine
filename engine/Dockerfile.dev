@@ -1,5 +1,21 @@
-FROM rust:1-bookworm
-RUN cargo install cargo-watch
+FROM lukemathwalker/cargo-chef:latest-rust-1 AS chef
 WORKDIR /app
+
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --recipe-path recipe.json
+
+FROM chef AS dev
+RUN wget -qO- https://github.com/watchexec/cargo-watch/releases/download/v8.5.3/cargo-watch-v8.5.3-x86_64-unknown-linux-gnu.tar.xz | tar xJ --strip-components=1 -C /usr/local/bin
+WORKDIR /app
+COPY --from=builder /app/target /tmp/target-cache
+COPY --from=builder /usr/local/cargo/registry /usr/local/cargo/registry
 EXPOSE 3001
+COPY entrypoint-dev.sh /entrypoint-dev.sh
+RUN chmod +x /entrypoint-dev.sh
+ENTRYPOINT ["/entrypoint-dev.sh"]
 CMD ["cargo", "watch", "-x", "run -p api-server"]
