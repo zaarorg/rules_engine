@@ -17,7 +17,7 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
-    networks: [app]
+    networks: [app, warranted-net]
 
   engine:
     build:
@@ -27,7 +27,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-rules}:${POSTGRES_PASSWORD:-rules}@postgres:5432/${POSTGRES_DB:-rules_engine}
       RUST_LOG: debug
     ports:
-      - "${ENGINE_PORT:-3001}:3001"
+      - "${ENGINE_PORT:-3002}:3001"
     depends_on:
       management:
         condition: service_healthy
@@ -42,7 +42,7 @@ services:
       timeout: 5s
       retries: 15
       start_period: 60s
-    networks: [app]
+    networks: [app, warranted-net]
 
   management:
     build:
@@ -67,7 +67,7 @@ services:
       timeout: 5s
       retries: 15
       start_period: 60s
-    networks: [app]
+    networks: [app, warranted-net]
 
   frontend:
     build:
@@ -92,7 +92,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
-    networks: [app]
+    networks: [app, warranted-net]
 
 volumes:
   postgres_data:
@@ -104,3 +104,5 @@ volumes:
 networks:
   app:
     driver: bridge
+  warranted-net:
+    external: true
